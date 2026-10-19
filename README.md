@@ -132,8 +132,9 @@ Practical consequences:
   (`window.bounds.x + local_x`).
 - Window captures are **scaled** — `frame_scale` tells you the ratio between the
   PNG and the real window. Divide by it before converting back.
-- Recording needs `wf-recorder` installed (`sudo apt install wf-recorder`), or
-  `x11grab` will only see XWayland surfaces.
+- Recording needs `wf-recorder` installed (`sudo apt install wf-recorder`). Without
+  it the wrapper warns and falls back to `x11grab`, which was measured producing a
+  **pure black** 3000×1920 frame under COSMIC — not a usable fallback.
 
 ### Recording on Linux
 

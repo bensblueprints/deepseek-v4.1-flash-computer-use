@@ -135,8 +135,9 @@ def capture_cmd(out: str, fps: int) -> list[str]:
         return ["wf-recorder", "-f", out, "-r", str(fps)]
 
     if os.environ.get("WAYLAND_DISPLAY"):
-        print("warning: Wayland session without wf-recorder; falling back to x11grab, "
-              "which only sees XWayland surfaces. Install wf-recorder for full-screen capture.",
+        print("warning: Wayland session without wf-recorder. x11grab only sees the "
+              "XWayland root, which composites to a black frame on most compositors. "
+              "Install wf-recorder (sudo apt install wf-recorder) for real capture.",
               file=sys.stderr)
 
     display = os.environ.get("DISPLAY", ":0")
