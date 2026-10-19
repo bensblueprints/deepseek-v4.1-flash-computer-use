@@ -21,7 +21,8 @@ starts it automatically if it is not running).
 
 ```powershell
 python cua.py status
-python cua.py shot --out screen.png
+python cua.py shot --out screen.png               # whole desktop
+python cua.py shot --out win.png --window <pid>:<wid>   # one window (needed on Wayland)
 python cua.py windows
 python cua.py move 400 300 --window <pid>:<wid>     # visible agent cursor
 python cua.py move 400 300 --desktop                 # real OS pointer
@@ -76,25 +77,35 @@ python cua.py record stop
 
 ## Linux
 
-Same commands; the display stack differs.
+Same commands; the display stack differs. Verified on Pop!_OS 24.04 / COSMIC
+(Wayland + XWayland).
 
 ```bash
-# install
+# install (user scope, no sudo)
 /bin/bash -c "$(curl -fsSL https://cua.ai/driver/install.sh)"
+
+# a non-interactive SSH shell has no display env — set it explicitly
+export DISPLAY=:1 XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1
 cua-driver serve
 ```
 
-- **X11** — works out of the box (driver injects input; `x11grab` captures).
-- **Wayland** — needs the compositor plugin (a Hyprland plugin ships with the
-  driver). Without it, capture and synthetic input may be refused.
-- **Headless** — run under `Xvfb :99 -screen 0 1920x1080x24` and
-  `export DISPLAY=:99`.
-- Recording: `cua.py record` switches to `wf-recorder` on Wayland and `x11grab`
-  on X11; `ddagrab` is Windows-only.
-- Always confirm the cursor appears in the first recorded frame — some Wayland
-  compositors drop always-on-top overlays.
+- **`list_windows`, `get_window_state`, `type_text`, `press_key`,
+  desktop-scope `click`, `move_cursor` — all work on XWayland.**
+- **`get_desktop_state` fails** under XWayland (`X11 GetImage BadMatch`). Use
+  `cua shot --window <pid>:<wid>`; that path works.
+- **Window-target `click` fails** with `screenshot_context_missing` — the CLI
+  cannot carry a snapshot between processes. Use `click X Y --desktop` with
+  absolute coordinates (`bounds.x + local_x`).
+- Window captures come back **scaled** (`frame_scale`, e.g. 0.758). Divide the
+  PNG coordinates by it to get real window pixels.
+- The **first keystroke after a focus change can be dropped** — send a throwaway
+  key or re-focus before typing anything that matters.
+- Recording needs `wf-recorder` (`sudo apt install wf-recorder`); without it the
+  wrapper warns and falls back to `x11grab`, which only sees XWayland surfaces.
+- **Headless**: `Xvfb :99 -screen 0 1920x1080x24 &` then `export DISPLAY=:99`.
 
-Run `cua-driver doctor` first on an unfamiliar box.
+Run `cua-driver doctor` first on an unfamiliar box — it reports whether the
+X11 connection and AT-SPI bus are reachable.
 
 ## Safety
 

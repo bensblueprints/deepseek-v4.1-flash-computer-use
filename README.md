@@ -97,16 +97,43 @@ them **preview** builds — check yours with `cua-driver doctor` and
 
 ### Display server
 
-| Session | Input | Capture |
-|---|---|---|
-| **X11** (simplest) | driver injects via XTest | `ffmpeg -f x11grab` |
-| **Wayland / Hyprland** | needs the compositor plugin (published as `cua-hyprland-plugin-*` in the driver release) | `wf-recorder` |
-| **Headless** | `Xvfb` virtual display | `x11grab` against `DISPLAY=:99` |
+| Session | Input | Window capture | Desktop capture |
+|---|---|---|---|
+| **X11** | XTest | works | works |
+| **Wayland + XWayland** (COSMIC, GNOME, KDE) | XTest into XWayland clients | **works** | **fails** — `X11 GetImage BadMatch` |
+| **Headless** | `Xvfb` + `DISPLAY=:99` | works | works |
 
-**X11 is the low-friction path.** Under a bare Wayland session the driver may
-report that it cannot see or drive windows, because generic synthetic input and
-screen capture are compositor-controlled. If you want this to just work, use an
-X11 session or the Hyprland plugin.
+**Use window capture on Wayland.** Whole-desktop capture (`get_desktop_state`)
+is the one thing that breaks under XWayland — everything else works.
+
+### Tested on Pop!_OS 24.04 / COSMIC (Wayland + XWayland)
+
+Measured, not assumed:
+
+| Operation | Result |
+|---|---|
+| `install.sh` | ok → `~/.local/bin/cua-driver` |
+| `cua-driver doctor` | `display server: Wayland+XWayland`, `X11 connection: connected` |
+| `list_windows` | works (X11/XWayland clients) |
+| `get_window_state` | **works** — 1456×713 from a 1920-wide window (`frame_scale: 0.758`) |
+| `get_desktop_state` | **fails** — `X11 error: Match (GetImage, BadMatch)` |
+| `type_text` | works (pty/XTest) — the first keystroke after a focus change can be dropped |
+| `press_key` | works |
+| `move_cursor` (window target) | accepted (`synthetic_events`) |
+| `click` (window target) | `screenshot_context_missing` — needs an in-process snapshot |
+| `click` (`scope: desktop`) | works — send screen-absolute coordinates |
+| `get_screen_size` | reported 3000×1920 |
+| `wf-recorder` / `grim` / `obs` | **not installed** by default; `ffmpeg` is |
+
+Practical consequences:
+
+- Use `cua shot --window <pid>:<wid>` on Wayland; plain `cua shot` will error.
+- Drive clicks with `cua click X Y --desktop` using absolute coordinates
+  (`window.bounds.x + local_x`).
+- Window captures are **scaled** — `frame_scale` tells you the ratio between the
+  PNG and the real window. Divide by it before converting back.
+- Recording needs `wf-recorder` installed (`sudo apt install wf-recorder`), or
+  `x11grab` will only see XWayland surfaces.
 
 ### Recording on Linux
 
@@ -117,8 +144,14 @@ X11 session or the Hyprland plugin.
 ffmpeg ... ddagrab=output_idx=0 ...
 # Wayland with wf-recorder installed
 wf-recorder -f take.mp4 -r 30
-# X11
+# X11 (or Wayland without wf-recorder — warns, and only sees XWayland surfaces)
 ffmpeg -f x11grab -framerate 30 -video_size 1920x1080 -i $DISPLAY ...
+```
+
+Install the Wayland recorder first:
+
+```bash
+sudo apt install wf-recorder     # or: yay -S wf-recorder
 ```
 
 Multi-monitor: override the grab size with `CUA_CAPTURE_SIZE=2560x1440`, and the
@@ -127,8 +160,8 @@ display with `DISPLAY=:1`.
 The agent cursor overlay is a separate always-on-top window. X11 compositors
 show it; some Wayland compositors ignore always-on-top/click-through requests,
 so **verify the cursor is in the first recorded frame** before doing a long take.
-On Wayland, `wf-recorder` captures what the compositor renders, which is usually
-what you want.
+I could not visually confirm the overlay on COSMIC from a headless SSH session —
+treat that as unverified on Wayland and check it yourself.
 
 ### Headless box (no monitor)
 
@@ -148,6 +181,7 @@ it, no physical display needed.
 
 - `ddagrab` — Windows only; use `x11grab` / `wf-recorder`
 - `taskkill` — the wrapper sends `SIGINT` on POSIX
+- **`get_desktop_state` under XWayland** — use `shot --window` instead
 - Windows-specific window concepts (`window_id` is still returned, but treat it
   as opaque)
 

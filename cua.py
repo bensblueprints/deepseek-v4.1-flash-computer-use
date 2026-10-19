@@ -87,9 +87,20 @@ def ensure_daemon() -> None:
         time.sleep(3)
 
 
-def shot(out: str = "screen.png") -> str:
-    """Capture the desktop and write a real PNG. Returns the path."""
-    data = call("get_desktop_state")
+def shot(out: str = "screen.png", window: str | None = None) -> str:
+    """Capture a window (pid:wid) or the desktop, and write a real PNG.
+
+    On Linux under Wayland, whole-desktop capture can fail (X11 GetImage
+    BadMatch via XWayland) while window capture works — so prefer --window there.
+    """
+    if window:
+        pid, wid = window.split(":")
+        data = call("get_window_state", {
+            "pid": int(pid), "window_id": int(wid),
+            "include_accessibility_tree": False,
+        })
+    else:
+        data = call("get_desktop_state")
     with open(out, "wb") as fh:
         fh.write(base64.b64decode(data["screenshot_png_b64"]))
     return out
@@ -123,6 +134,11 @@ def capture_cmd(out: str, fps: int) -> list[str]:
     if os.environ.get("WAYLAND_DISPLAY") and shutil.which("wf-recorder"):
         return ["wf-recorder", "-f", out, "-r", str(fps)]
 
+    if os.environ.get("WAYLAND_DISPLAY"):
+        print("warning: Wayland session without wf-recorder; falling back to x11grab, "
+              "which only sees XWayland surfaces. Install wf-recorder for full-screen capture.",
+              file=sys.stderr)
+
     display = os.environ.get("DISPLAY", ":0")
     size = os.environ.get("CUA_CAPTURE_SIZE", "1920x1080")
     return [
@@ -149,7 +165,9 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status")
-    p = sub.add_parser("shot"); p.add_argument("--out", default="screen.png")
+    p = sub.add_parser("shot")
+    p.add_argument("--out", default="screen.png")
+    p.add_argument("--window", help="pid:wid — capture just that window")
     sub.add_parser("windows")
 
     p = sub.add_parser("move")
@@ -181,7 +199,7 @@ def main() -> None:
         print(subprocess.run([driver(), "status"], capture_output=True, text=True).stdout.strip())
 
     elif args.cmd == "shot":
-        print(shot(args.out))
+        print(shot(args.out, args.window))
 
     elif args.cmd == "windows":
         data = call("list_windows")
