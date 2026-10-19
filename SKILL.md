@@ -100,9 +100,10 @@ cua-driver serve
   PNG coordinates by it to get real window pixels.
 - The **first keystroke after a focus change can be dropped** — send a throwaway
   key or re-focus before typing anything that matters.
-- Recording needs `wf-recorder` (`sudo apt install wf-recorder`); without it the
-  wrapper warns and falls back to `x11grab`, which produced a **black frame**
-  under COSMIC. Do not treat x11grab as a fallback there.
+- Recording needs `wf-recorder` on wlroots compositors (`sudo apt install wf-recorder`).
+  **COSMIC does not implement `wlr-screencopy`** — wf-recorder exits immediately.
+  Use OBS via the ScreenCast portal there, or an X11 session.
+  Without a working recorder the fallback `x11grab` produced a **black frame**.
 - **Headless**: `Xvfb :99 -screen 0 1920x1080x24 &` then `export DISPLAY=:99`.
 
 Run `cua-driver doctor` first on an unfamiliar box — it reports whether the

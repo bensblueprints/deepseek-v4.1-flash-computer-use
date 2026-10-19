@@ -123,7 +123,7 @@ Measured, not assumed:
 | `click` (window target) | `screenshot_context_missing` — needs an in-process snapshot |
 | `click` (`scope: desktop`) | works — send screen-absolute coordinates |
 | `get_screen_size` | reported 3000×1920 |
-| `wf-recorder` / `grim` / `obs` | **not installed** by default; `ffmpeg` is |
+| `wf-recorder` / `grim` / `obs` | **not installed**; `ffmpeg` is. After installing wf-recorder: `compositor doesn't support wlr-screencopy-unstable-v1` |
 
 Practical consequences:
 
@@ -132,9 +132,12 @@ Practical consequences:
   (`window.bounds.x + local_x`).
 - Window captures are **scaled** — `frame_scale` tells you the ratio between the
   PNG and the real window. Divide by it before converting back.
-- Recording needs `wf-recorder` installed (`sudo apt install wf-recorder`). Without
-  it the wrapper warns and falls back to `x11grab`, which was measured producing a
-  **pure black** 3000×1920 frame under COSMIC — not a usable fallback.
+- Recording needs `wf-recorder` on wlroots compositors (`sudo apt install wf-recorder`).
+  **COSMIC does not implement `wlr-screencopy-unstable-v1`**, so `wf-recorder`
+  exits with "compositor doesn't support wlr-screencopy-unstable-v1". There,
+  record through the ScreenCast portal instead (OBS), or use an X11 session.
+  Without a working recorder the wrapper warns and falls back to `x11grab`, which
+  was measured producing a **pure black** 3000×1920 frame — not usable.
 
 ### Recording on Linux
 
